@@ -121,7 +121,6 @@ return {
         engine = "cloud",
         highlight = true,          -- highlight the sentence being read
         prefetch = 2,              -- sentences fetched ahead (cloud voices)
-        stop_at_chapter_end = false,
     },
 
     timeout = 60,    -- seconds to wait for one network request

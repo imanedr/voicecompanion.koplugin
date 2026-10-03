@@ -173,6 +173,50 @@ function Voice:speak(text, opts, on_done)
     end)
 end
 
+--- Speak a list of texts in order, fetching ahead while one plays.
+-- @param items table  array of strings, or a function(i) -> string|nil
+--   (a function lets the caller produce items lazily, e.g. book sentences)
+-- @param opts table  speak options plus `prefetch` (items fetched ahead)
+-- @param hooks table { on_item = function(i, text), on_done = function(ok, err) }
+function Voice:speakSequence(items, opts, hooks)
+    opts = opts or {}
+    hooks = hooks or {}
+    local get = type(items) == "function" and items or function(i) return items[i] end
+    local prefetch = opts.prefetch or 2
+    self:stop()
+    local seq_gen = self._gen
+    local index = 0
+
+    local function playNext()
+        if seq_gen ~= self._gen then return end
+        index = index + 1
+        local text = get(index)
+        if not text then
+            self.busy = false
+            if hooks.on_done then hooks.on_done(true) end
+            return
+        end
+        if hooks.on_item then hooks.on_item(index, text) end
+        -- speak() bumps the generation; keep our sequence id in step.
+        self:speak(text, opts, function(ok, err)
+            if not ok then
+                self.busy = false
+                if hooks.on_done then hooks.on_done(false, err) end
+                return
+            end
+            playNext()
+        end)
+        seq_gen = self._gen
+        -- Request the current item first, then the ones after it.
+        for k = 1, prefetch do
+            local ahead = get(index + k)
+            if not ahead then break end
+            self:prepare(ahead, opts)
+        end
+    end
+    playNext()
+end
+
 function Voice:stop()
     self._gen = self._gen + 1
     self.busy = false
