@@ -122,6 +122,17 @@ describe("Provider.speech", function()
         assert_nil(io.open(out .. ".pcm"), "temporary .pcm file should be removed")
     end)
 
+    it("requests pcm from Gemini TTS models even when audio_format is mp3", function()
+        Stubs.http.handler = function() return 200, PCM end
+        local p = provider({ tts_model = "google/gemini-2.5-flash-preview-tts", audio_format = "mp3" })
+        assert_eq(Provider.audioFormat(p), "pcm")
+        assert_eq(Provider.audioFormat(provider({ audio_format = "mp3" })), "mp3")
+        local out = Stubs.TMP .. "/g.wav"
+        assert_true(Provider.speech(p, "a", out, {}))
+        assert_eq(JSON.decode(Stubs.http.requests[1].body).response_format, "pcm")
+        assert_eq(read(out):sub(1, 4), "RIFF")
+    end)
+
     it("keeps a ready-made WAV response", function()
         local wav = "RIFF" .. string.rep("\0", 100)
         Stubs.http.handler = function() return 200, wav end

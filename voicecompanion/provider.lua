@@ -42,13 +42,21 @@ function Provider.writeWav(path, pcm, sample_rate)
     return true
 end
 
+--- The audio format to request from `p`.  Some models accept only raw PCM
+-- (Gemini TTS rejects mp3 with HTTP 400), whatever audio_format says.
+function Provider.audioFormat(p)
+    local model = tostring(p.tts_model or ""):lower()
+    if model:find("gemini", 1, true) then return "pcm" end
+    return p.audio_format or "mp3"
+end
+
 --- Synthesize speech to `out_path`.
 -- @param opts table { voice, speed, format ("mp3"|"pcm"), model, extra = {} }
 -- @return boolean ok, string error_or_out_path
 function Provider.speech(p, text, out_path, opts)
     opts = opts or {}
     local JSON = require("json")
-    local format = opts.format or p.audio_format or "mp3"
+    local format = opts.format or Provider.audioFormat(p)
     local body = {
         model = opts.model or p.tts_model,
         input = text,
