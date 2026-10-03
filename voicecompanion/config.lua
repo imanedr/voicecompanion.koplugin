@@ -64,7 +64,6 @@ Config.DEFAULTS = {
         highlight = true,
         -- Sentences fetched ahead while one is playing (cloud voices).
         prefetch = 2,
-        stop_at_chapter_end = false,
     },
     -- Seconds to wait for one network request.
     timeout = 60,
