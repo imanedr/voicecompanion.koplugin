@@ -109,6 +109,7 @@ Common issues:
 |---|---|
 | "No API key for provider" | Add the key in Settings or `configuration.lua` |
 | `HTTP 404 … check the model name` | The model ID is wrong or not available from your provider |
+| `HTTP 400 … only supports response_format="pcm"` (e.g. Gemini TTS) | Settings → **Audio format → pcm**, and set a voice the model supports |
 | Cloud voice speaks too fast or slow | Only with `audio_format = "pcm"`: set `sample_rate` to match your model |
 | Device voice: "did not start" | Install or select a TTS engine in Android settings |
 | Android device voice can't pause | Android's speech engine has no pause, so pausing stops and resuming restarts the sentence |
