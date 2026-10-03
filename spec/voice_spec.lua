@@ -151,6 +151,41 @@ describe("Voice (cloud engine, fake player and network)", function()
         assert_match(err, "HTTP 500")
     end)
 
+    it("speakSequence fetches ahead only after the current item's audio is ready", function()
+        local voice = newVoice()
+        Stubs.http.handler = function(req) return 200, PCM .. req.body end
+        voice:speakSequence({ "A.", "B.", "C." }, { engine = "cloud", prefetch = 2 }, {})
+        assert_eq(#Stubs.http.requests, 1, "only the first item is requested up front")
+        UIManager._drain()
+        assert_eq(#Stubs.http.requests, 3)
+        assert_eq(#voice.player.played, 3)
+    end)
+
+    it("reports states: loading, playing, idle (none between sequence items)", function()
+        local voice = newVoice()
+        local states = {}
+        voice.on_state = function(s) table.insert(states, s) end
+        Stubs.http.handler = function(req) return 200, PCM .. req.body end
+        voice:speakSequence({ "A.", "B.", "C." }, { engine = "cloud" }, {})
+        assert_eq(voice:canPause(), false, "audio still loading cannot pause")
+        UIManager._drain()
+        assert_eq(states, { "loading", "playing", "idle" })
+    end)
+
+    it("reports idle on stop() and on failure", function()
+        local voice = newVoice()
+        local states = {}
+        voice.on_state = function(s) table.insert(states, s) end
+        voice:speak("Hello", { engine = "cloud" })
+        voice:stop()
+        assert_eq(states, { "loading", "idle" })
+        Stubs.http.handler = function() return 500, "boom" end
+        states = {}
+        voice:speak("Other", { engine = "cloud" })
+        UIManager._drain()
+        assert_eq(states, { "loading", "idle" })
+    end)
+
     it("speakSequence accepts a generator function", function()
         local voice = newVoice()
         local texts = { "One.", "Two." }

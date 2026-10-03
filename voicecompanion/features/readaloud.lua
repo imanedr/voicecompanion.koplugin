@@ -109,22 +109,24 @@ end
 
 function ReadAloud:stop()
     if self.state == "stopped" then return end
-    self.plugin:getVoice():stop()
     self:_finish()
     self.current = nil
+    self.plugin:getVoice():stop()
 end
 
 --- Pause/resume.  File playback pauses in place; the Android system voice
--- can't pause, so it stops and later restarts the current sentence.
+-- (and audio still loading) can't pause, so it stops and later restarts the
+-- current sentence.
 function ReadAloud:togglePause()
     local voice = self.plugin:getVoice()
     if self.state == "playing" then
+        -- Set first: the voice reports its state change right away.
+        self.state = "paused"
         if voice:canPause() then
             voice:pause()
         else
             voice:stop()
         end
-        self.state = "paused"
     elseif self.state == "paused" then
         if voice:isPaused() then
             voice:resume()
