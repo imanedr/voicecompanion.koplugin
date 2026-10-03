@@ -77,6 +77,7 @@ You can also mix voices: in `configuration.lua`, set `pronounce.engine`, `read_a
 | Select text → **Speak** | Read the selection aloud |
 | Select text → **Voice…** | Speak slowly, Pronunciation coach, Read aloud from here, Explain, Define in context, Translate, Ask about this… |
 | Dictionary popup → **🔊 Speak** / **Pronunciation** | Hear a word you looked up (long-press 🔊 for slow) |
+| Playback bar | While anything is spoken, a small bar at the bottom of the page shows *Loading voice… / Reading / Paused* with **Pause/Resume** and **Stop** |
 | Tools → **Voice Companion** | Read aloud from this page, Pause/Resume, Stop, Summarize this page, Ask about the book, Settings, Diagnostics |
 | Gestures | *Voice Companion: read aloud / pause-resume / stop / summarize* in KOReader's gesture manager |
 
@@ -97,6 +98,8 @@ Audio is cached on the device (50 MB by default), so replaying a word or sentenc
 - audio player (a test beep)
 - cloud voice
 - device voice
+
+Each voice request's timing (request start, how long it took, playback start) is written to `koreader/cache/voicecompanion/timing.log`. It helps when speech is slow to start.
 
 Before each test starts, a line is written to `koreader/cache/voicecompanion/diagnostics.log`. If KOReader ever closes during a test, the Diagnostics menu shows **"⚠ Last run stopped during: …"** next time. Please include that in a bug report.
 

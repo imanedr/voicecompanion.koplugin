@@ -54,8 +54,31 @@ end
 function VoiceCompanion:getVoice()
     if not self.voice then
         self.voice = require("voicecompanion/voice"):new()
+        self.voice.on_state = function(state) self:onVoiceState(state) end
     end
     return self.voice
+end
+
+--- On-page playback bar, created on first use (reader only).
+function VoiceCompanion:getBar()
+    if not self.bar and self.ui.view and self.ui.view.registerViewModule then
+        self.bar = require("voicecompanion/ui/controlbar"):new(self.ui, {
+            toggle = function() self:onVoiceCompanionPauseResume() end,
+            stop = function() self:onVoiceCompanionStop() end,
+        })
+    end
+    return self.bar
+end
+
+--- Keep the bar in step with the voice.  Read-aloud paused on a voice that
+-- can't pause (or while loading) is a stopped voice: still show "Paused".
+function VoiceCompanion:onVoiceState(state)
+    if state == "idle" and self.read_aloud and self.read_aloud.state == "paused" then
+        state = "paused"
+    end
+    local bar = self:getBar()
+    if not bar then return end
+    if state == "idle" then bar:hide() else bar:show(state) end
 end
 
 function VoiceCompanion:getReadAloud()
