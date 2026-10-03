@@ -55,7 +55,8 @@ return {
             -- OpenAI: alloy, ash, ballad, coral, echo, fable, nova, onyx, sage, shimmer
             voice = "af_heart",
 
-            -- "mp3" (smaller downloads) or "pcm" (raw audio).
+            -- "mp3" (smaller downloads) or "pcm" (raw audio).  Gemini TTS
+            -- models only produce pcm, so they always use pcm.
             audio_format = "mp3",
             -- Only for "pcm": sample rate of the raw audio (24000 for Kokoro/OpenAI).
             sample_rate = 24000,
