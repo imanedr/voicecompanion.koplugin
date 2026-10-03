@@ -1,0 +1,19 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install LuaJIT and luacheck
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y luajit lua-check
+      - name: Lint
+        run: luacheck .
+      - name: Unit tests
+        run: luajit spec/run.lua

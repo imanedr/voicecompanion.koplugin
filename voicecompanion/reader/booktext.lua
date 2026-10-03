@@ -118,7 +118,7 @@ function BookText.sentenceFrom(ui, ws)
     local cur = ws
     while true do
         local ok_e, we = pcall(doc.getNextVisibleWordEnd, doc, cur)
-        if not ok_e or not we then pos1 = pos1 or cur break end
+        if not ok_e or not we then pos1 = cur break end
         local ok_s, nws = pcall(doc.getNextVisibleWordStart, doc, we)
         words = words + 1
         if not ok_s or not nws or nws == cur then

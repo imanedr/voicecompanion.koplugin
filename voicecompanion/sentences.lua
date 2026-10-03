@@ -27,9 +27,10 @@ function Sentences.split(text)
         local i = 1
         while i <= #para do
             local c = para:sub(i, i)
-            if c == "." or c == "!" or c == "?" or c == "…" then
+            local ellipsis = para:sub(i, i + 2) == "\226\128\166"
+            if c == "." or c == "!" or c == "?" or ellipsis then
                 -- Include closing quotes/brackets and repeated punctuation.
-                local j = i
+                local j = ellipsis and i + 2 or i
                 while j < #para and para:sub(j + 1, j + 1):match("[%.!?\"')%]]") do j = j + 1 end
                 -- Multi-byte closing quotes (” ’ »).
                 while para:sub(j + 1, j + 3) == "\226\128\157" or para:sub(j + 1, j + 3) == "\226\128\153" do j = j + 3 end

@@ -10,7 +10,6 @@ coach for a word costs nothing.
 local InfoMessage = require("ui/widget/infomessage")
 local UIManager = require("ui/uimanager")
 local AI = require("voicecompanion/ai")
-local Async = require("voicecompanion/async")
 local AudioCache = require("voicecompanion/audiocache")
 local Config = require("voicecompanion/config")
 local Provider = require("voicecompanion/provider")
