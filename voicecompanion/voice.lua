@@ -108,7 +108,7 @@ function Voice:_plan(text, opts, cfg)
     if Config.isKeyMissing(p.api_key) then
         return nil, string.format("No API key for provider %q. Add it in configuration.lua or Settings.", p.name)
     end
-    local format = Provider.audioFormat(p)
+    local format = p.audio_format or "mp3"
     if not Device:isAndroid() and format == "mp3" then
         local LinuxPlayer = require("voicecompanion/audio/linux_player")
         if not LinuxPlayer.canPlayMp3() then format = "pcm" end

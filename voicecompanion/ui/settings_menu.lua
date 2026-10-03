@@ -141,7 +141,32 @@ function SettingsMenu.build()
             description = _("Must be a voice the speech model supports (Kokoro: af_heart, bf_emma, am_michael …)."),
         }))
     table.insert(items, inputItem(function() return T(_("Speech model: %1"), tostring(current("tts_model"))) end,
-        providerField("tts_model"), { title = _("Speech model"), hint = "hexgrad/kokoro-82m" }))
+        providerField("tts_model"), {
+            title = _("Speech model"), hint = "hexgrad/kokoro-82m",
+            description = _("Some models need a specific audio format (Gemini TTS: pcm). Set it under Audio format."),
+        }))
+    table.insert(items, {
+        text_func = function() return T(_("Audio format: %1"), tostring(current("audio_format") or "mp3")) end,
+        sub_item_table_func = function()
+            local function formatItem(format, label)
+                return {
+                    text = label,
+                    checked_func = function() return (current("audio_format") or "mp3") == format end,
+                    callback = function() saveOrWarn(providerField("audio_format")(Config.load()), format) end,
+                }
+            end
+            return {
+                formatItem("mp3", _("mp3 (smaller downloads)")),
+                formatItem("pcm", _("pcm (raw audio; required by Gemini TTS)")),
+            }
+        end,
+    })
+    table.insert(items, inputItem(function()
+        return T(_("PCM sample rate: %1"), tostring(current("sample_rate")))
+    end, providerField("sample_rate"), {
+        title = _("PCM sample rate"), hint = "24000", kind = "number",
+        description = _("Only used with pcm. Must match the model's output, or speech plays too fast or too slow (Kokoro, OpenAI and Gemini: 24000)."),
+    }))
     table.insert(items, inputItem(function() return T(_("Chat model: %1"), tostring(current("chat_model"))) end,
         providerField("chat_model"), {
             title = _("Chat model"), hint = "google/gemini-3.8-flash",
