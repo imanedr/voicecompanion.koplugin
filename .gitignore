@@ -1,0 +1,7 @@
+# Personal configuration with API keys (never commit)
+configuration.lua
+configuration.lua.tmp
+
+# Local test artifacts
+/spec/tmp/
+/dist/
