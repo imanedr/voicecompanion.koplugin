@@ -10,7 +10,6 @@ local UIManager = require("ui/uimanager")
 local AI = require("voicecompanion/ai")
 local BookText = require("voicecompanion/reader/booktext")
 local Config = require("voicecompanion/config")
-local T = require("ffi/util").template
 local _ = require("gettext")
 
 local Explain = {}
@@ -35,7 +34,7 @@ Explain.MODES = {
     {
         id = "summary",
         title = _("Summarize the page"),
-        prompt = "Summarize what happens in the current page of the book (given as the book context) in a few spoken-style sentences. Do not reveal anything beyond it.",
+        prompt = "Summarize this page of the book in a few spoken-style sentences, using the earlier context only to make it understandable. Do not reveal anything beyond it.\n\nCurrent page: «%s»",
         no_selection = true,
     },
 }
@@ -73,7 +72,17 @@ function Explain.run(plugin, mode_id, selection)
     if not mode.no_selection and (not text or text:match("^%s*$")) then return end
 
     local context = BookText.contextText(ui, cfg.explain.max_context_chars or 6000)
-    local user = mode.no_selection and mode.prompt or string.format(mode.prompt, text)
+    local user
+    if mode.no_selection then
+        local page = BookText.pageText(ui)
+        if not page or page == "" then
+            UIManager:show(InfoMessage:new{ text = _("Page text is only available for EPUB-style books.") })
+            return
+        end
+        user = string.format(mode.prompt, page)
+    else
+        user = string.format(mode.prompt, text)
+    end
     if mode_id == "define" then
         local sentence = BookText.selectionSentence(ui, selection)
         if sentence then user = user .. "\nSentence: «" .. sentence .. "»" end

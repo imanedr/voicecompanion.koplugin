@@ -95,8 +95,11 @@ function ReadAloud:_show(sentence)
     if self.cfg.read_aloud.highlight then
         BookText.highlight(ui, sentence)
     end
-    -- Count listening as activity so the device doesn't auto-suspend.
-    UIManager:broadcastEvent(Event:new("InputEvent"))
+    -- Count listening as activity so the device doesn't auto-suspend
+    -- (the AutoSuspend plugin listens on this hook for user input).
+    if UIManager.event_hook then
+        pcall(UIManager.event_hook.execute, UIManager.event_hook, "InputEvent")
+    end
 end
 
 function ReadAloud:_finish()

@@ -1,0 +1,42 @@
+local JNI = require("voicecompanion/jni")
+
+describe("JNI.parseSignature", function()
+    it("parses object and primitive parameters", function()
+        local params, ret = JNI.parseSignature("(Ljava/lang/CharSequence;ILandroid/os/Bundle;Ljava/lang/String;)I")
+        assert_eq(params, { "L", "I", "L", "L" })
+        assert_eq(ret, "I")
+    end)
+
+    it("parses an empty parameter list", function()
+        local params, ret = JNI.parseSignature("()V")
+        assert_eq(params, {})
+        assert_eq(ret, "V")
+    end)
+
+    it("parses primitives", function()
+        local params, ret = JNI.parseSignature("(F)I")
+        assert_eq(params, { "F" })
+        assert_eq(ret, "I")
+    end)
+
+    it("treats arrays as objects", function()
+        local params, ret = JNI.parseSignature("([Ljava/lang/Object;[I)[Ljava/lang/String;")
+        assert_eq(params, { "L", "L" })
+        assert_eq(ret, "L")
+    end)
+
+    it("handles multi-dimensional arrays", function()
+        local params = JNI.parseSignature("([[JZ)V")
+        assert_eq(params, { "L", "Z" })
+    end)
+
+    it("rejects malformed signatures", function()
+        assert_eq(pcall(JNI.parseSignature, "garbage"), false)
+    end)
+end)
+
+describe("JNI.available", function()
+    it("is false off Android", function()
+        assert_eq(JNI.available(), false)
+    end)
+end)
