@@ -33,17 +33,58 @@ function Provider.writeWav(path, pcm, sample_rate)
     end
     local function le16(n) return string.char(n % 256, math.floor(n / 256) % 256) end
     if #pcm % 2 == 1 then pcm = pcm:sub(1, -2) end
-    local f, err = io.open(path, "wb")
+    return Provider.writeFile(path, "RIFF" .. le32(36 + #pcm) .. "WAVE"
+        .. "fmt " .. le32(16) .. le16(1) .. le16(1) .. le32(sample_rate) .. le32(sample_rate * 2) .. le16(2) .. le16(16)
+        .. "data" .. le32(#pcm) .. pcm)
+end
+
+--- Write `data` to `path` through a temporary file and a rename, so a
+-- process killed mid-write never leaves a truncated file behind.
+function Provider.writeFile(path, data)
+    local part = path .. ".part"
+    local f, err = io.open(part, "wb")
     if not f then return false, err end
-    f:write("RIFF", le32(36 + #pcm), "WAVE",
-        "fmt ", le32(16), le16(1), le16(1), le32(sample_rate), le32(sample_rate * 2), le16(2), le16(16),
-        "data", le32(#pcm), pcm)
+    f:write(data)
     f:close()
+    local ok, rerr = os.rename(part, path)
+    if not ok then
+        os.remove(part)
+        return false, rerr
+    end
     return true
 end
 
+-- Samples quieter than this (out of 32767) count as silence.
+Provider.SILENCE_LEVEL = 300
+
+--- Cut leading and trailing silence from 16-bit little-endian mono PCM,
+-- keeping a short natural margin.  Some models (Gemini TTS) pad every
+-- clip with up to a few seconds of silence, which is heard as a pause
+-- between sentences.
+function Provider.trimSilence(pcm, sample_rate, lead_ms, tail_ms)
+    local n = math.floor(#pcm / 2)
+    if n == 0 then return pcm end
+    local byte = string.byte
+    local level = Provider.SILENCE_LEVEL
+    local function loud(i)   -- i = 0-based sample index
+        local lo, hi = byte(pcm, 2 * i + 1, 2 * i + 2)
+        local v = lo + hi * 256
+        if v >= 32768 then v = v - 65536 end
+        return v > level or v < -level
+    end
+    local first = 0
+    while first < n and not loud(first) do first = first + 1 end
+    if first == n then return pcm end   -- all silence: leave it alone
+    local last = n - 1
+    while last > first and not loud(last) do last = last - 1 end
+    first = math.max(0, first - math.floor(sample_rate * (lead_ms or 60) / 1000))
+    last = math.min(n - 1, last + math.floor(sample_rate * (tail_ms or 250) / 1000))
+    return pcm:sub(2 * first + 1, 2 * last + 2)
+end
+
 --- Synthesize speech to `out_path`.
--- @param opts table { voice, speed, format ("mp3"|"pcm"), model, extra = {} }
+-- @param opts table { voice, speed, format ("mp3"|"pcm"), model, extra = {},
+--   trim_silence (pcm only) }
 -- @return boolean ok, string error_or_out_path
 function Provider.speech(p, text, out_path, opts)
     opts = opts or {}
@@ -81,14 +122,15 @@ function Provider.speech(p, text, out_path, opts)
     end
     if format == "pcm" then
         os.remove(raw_path)
+        local ok, werr
         if data:sub(1, 4) == "RIFF" then
-            local wf = io.open(out_path, "wb")
-            wf:write(data)
-            wf:close()
+            ok, werr = Provider.writeFile(out_path, data)
         else
-            local ok, werr = Provider.writeWav(out_path, data, tonumber(p.sample_rate) or 24000)
-            if not ok then return false, werr end
+            local rate = tonumber(p.sample_rate) or 24000
+            if opts.trim_silence then data = Provider.trimSilence(data, rate) end
+            ok, werr = Provider.writeWav(out_path, data, rate)
         end
+        if not ok then return false, werr end
     end
     return true, out_path
 end

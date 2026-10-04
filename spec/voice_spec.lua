@@ -186,6 +186,83 @@ describe("Voice (cloud engine, fake player and network)", function()
         assert_eq(states, { "loading", "idle" })
     end)
 
+    it("retries a request once after a server error", function()
+        local calls = 0
+        Stubs.http.handler = function()
+            calls = calls + 1
+            if calls == 1 then return 503, "busy" end
+            return 200, PCM
+        end
+        local voice = newVoice()
+        local ok
+        voice:speak("Hello", { engine = "cloud" }, function(o) ok = o end)
+        UIManager._drain()
+        assert_eq(ok, true)
+        assert_eq(calls, 2)
+    end)
+
+    it("does not retry a client error", function()
+        Stubs.http.handler = function() return 400, "bad" end
+        local voice = newVoice()
+        voice:speak("Hello", { engine = "cloud" })
+        UIManager._drain()
+        assert_eq(#Stubs.http.requests, 1)
+    end)
+
+    it("stop() cancels requests made ahead", function()
+        local voice = newVoice()
+        local called = false
+        voice:prepare("Ahead", { engine = "cloud" }, function() called = true end)
+        assert_eq(voice._fetching, 1)
+        voice:stop()
+        UIManager._drain()
+        assert_eq(called, false)
+        assert_eq(voice._fetching, 0)
+        assert_eq(next(voice._inflight), nil)
+    end)
+
+    it("speakSequence fetches ahead with up to `parallel` requests at once", function()
+        for _, parallel in ipairs({ 1, 2 }) do
+            -- A different text set per run, so the second run isn't cached.
+            local voice = newVoice()
+            local max = 0
+            -- The fake network answers inside the request, so the number of
+            -- requests in flight is visible there.
+            Stubs.http.handler = function(req)
+                max = math.max(max, voice._fetching)
+                return 200, PCM .. req.body
+            end
+            local items = {}
+            for i = 1, 5 do items[i] = parallel .. ":" .. i end
+            local before = #Stubs.http.requests
+            voice:speakSequence(items, { engine = "cloud", prefetch = 3, parallel = parallel }, {})
+            UIManager._drain()
+            assert_eq(max, parallel, "parallel = " .. parallel)
+            assert_eq(#voice.player.played, 5)
+            assert_eq(#Stubs.http.requests - before, 5, "each text fetched once")
+        end
+    end)
+
+    it("speakSequence reports on_play for each item", function()
+        local voice = newVoice()
+        Stubs.http.handler = function(req) return 200, PCM .. req.body end
+        local played = {}
+        voice:speakSequence({ "A.", "B." }, { engine = "cloud" }, {
+            on_play = function(i, text) table.insert(played, i .. ":" .. text) end,
+        })
+        UIManager._drain()
+        assert_eq(played, { "1:A.", "2:B." })
+    end)
+
+    it("trimmed pcm audio gets its own cache entry", function()
+        local voice = newVoice()
+        local cfg = Config.load()
+        local trimmed = voice:_plan("Hi", { engine = "cloud" }, cfg)
+        cfg.trim_silence = false
+        local untrimmed = voice:_plan("Hi", { engine = "cloud" }, cfg)
+        assert_true(trimmed.path ~= untrimmed.path)
+    end)
+
     it("speakSequence accepts a generator function", function()
         local voice = newVoice()
         local texts = { "One.", "Two." }

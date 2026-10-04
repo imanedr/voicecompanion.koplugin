@@ -37,10 +37,18 @@ function Http.post(url, body, opts)
     end
     local data = table.concat(chunks)
     if opts.sink_path and code >= 200 and code < 300 then
-        local f, err = io.open(opts.sink_path, "wb")
+        -- Write then rename, so a process killed mid-write never leaves a
+        -- truncated file that later passes for complete audio.
+        local part = opts.sink_path .. ".part"
+        local f, err = io.open(part, "wb")
         if not f then return code, nil, resp_headers or {}, "cannot write " .. tostring(err) end
         f:write(data)
         f:close()
+        local ok, rerr = os.rename(part, opts.sink_path)
+        if not ok then
+            os.remove(part)
+            return code, nil, resp_headers or {}, "cannot write " .. tostring(rerr)
+        end
         return code, nil, resp_headers or {}, nil
     end
     return code, data, resp_headers or {}, nil

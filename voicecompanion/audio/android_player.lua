@@ -25,6 +25,7 @@ end
 function AndroidPlayer:_release()
     local mp = self._mp
     self._mp = nil
+    self._position, self._duration = nil, nil
     self._token = (self._token or 0) + 1
     if mp then
         JNI.run(function(J)
@@ -56,6 +57,7 @@ function AndroidPlayer:play(path, on_done)
     self._token = (self._token or 0) + 1
     local token = self._token
     local duration = result.duration or 0
+    self._position, self._duration = 0, duration > 0 and duration or nil
     local idle_polls = 0
 
     local function poll()
@@ -77,6 +79,7 @@ function AndroidPlayer:play(path, on_done)
         end
         -- Done when the player stopped on its own, confirmed on two polls
         -- (a single false reading right after start() is possible).
+        self._position = state.position
         if not state.playing then
             idle_polls = idle_polls + 1
         else
@@ -104,6 +107,12 @@ function AndroidPlayer:resume()
     if not self._mp or not self._paused then return end
     local ok = JNI.run(function(J) J:call(self._mp, "start", "()V") end)
     if ok then self._paused = false end
+end
+
+--- ms played and ms total (nil if unknown), or nil when not playing.
+function AndroidPlayer:progress()
+    if not self._mp then return nil end
+    return self._position or 0, self._duration
 end
 
 function AndroidPlayer:isPaused()

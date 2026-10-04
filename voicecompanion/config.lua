@@ -62,9 +62,19 @@ Config.DEFAULTS = {
     read_aloud = {
         engine = "cloud",
         highlight = true,
-        -- Sentences fetched ahead while one is playing (cloud voices).
+        -- Sentences are grouped into requests of about this many
+        -- characters (0 = one sentence per request).  Longer groups mean
+        -- fewer requests and a steadier AI voice; the whole group is
+        -- highlighted.
+        chunk_chars = 300,
+        -- Groups fetched ahead while one is playing (cloud voices).
         prefetch = 2,
+        -- Requests made at once while fetching ahead.
+        parallel = 2,
     },
+    -- Cut the silence some models (Gemini TTS) add around each clip.
+    -- pcm audio only.
+    trim_silence = true,
     -- Seconds to wait for one network request.
     timeout = 60,
     -- Megabytes of audio kept in the cache (repeat plays are free).

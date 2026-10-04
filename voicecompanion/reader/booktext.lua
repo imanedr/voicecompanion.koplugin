@@ -14,7 +14,7 @@ local BookText = {
 
 local ABBREVIATIONS = {
     mr = true, mrs = true, ms = true, dr = true, prof = true, st = true, jr = true, sr = true,
-    vs = true, etc = true, ["e.g"] = true, ["i.e"] = true, no = true, vol = true, fig = true,
+    vs = true, etc = true, ["e.g"] = true, ["i.e"] = true, vol = true, fig = true,
     gen = true, col = true, capt = true, lt = true, sgt = true, rev = true, mt = true,
 }
 
@@ -51,6 +51,8 @@ function BookText.endsSentence(chunk, next_word)
         local word = s:match("([^%s]+)%.$") or ""
         local bare = word:lower():gsub("^[%(\"']+", ""):gsub("^\226\128[\156\152]", "")
         if ABBREVIATIONS[bare] then return false end
+        -- "No. 5", but "I said no. Then"
+        if bare == "no" and next_word and next_word:match("^%d") then return false end
         if #bare == 1 and bare:match("%a") then return false end   -- initials: "J. Smith"
     end
     if next_word and next_word:match("^%l") then return false end
@@ -113,6 +115,7 @@ function BookText.sentenceFrom(ui, ws)
     end
     local pos1
     local next_start
+    local ends_block = false
     local trailing = ""
     local words = 0
     local cur = ws
@@ -145,6 +148,7 @@ function BookText.sentenceFrom(ui, ws)
                 end
             end
             next_start = nws
+            ends_block = new_block or chunk:find("\n") ~= nil
             break
         end
         cur = nws
@@ -155,6 +159,7 @@ function BookText.sentenceFrom(ui, ws)
         pos0 = pos0,
         pos1 = pos1,
         next_start = next_start,
+        ends_block = ends_block,   -- the paragraph (or other block) ends here
     }
 end
 
@@ -257,6 +262,38 @@ function BookText.selectionSentence(ui, selected)
         return ((before .. middle .. after):gsub("%s+", " "):gsub("^%s+", ""):gsub("%s+$", ""))
     end)
     return ok and text or nil
+end
+
+-- ── Following the reading position across pages ──────────────────────
+
+--- Position right after the last visible page (two in dual-page mode), or
+-- nil when the whole rest of the book is visible or the view scrolls.
+function BookText.viewEnd(ui)
+    local doc = ui.document
+    if ui.view and ui.view.view_mode and ui.view.view_mode ~= "page" then return nil end
+    local ok, xp = pcall(function()
+        local count = doc.getVisiblePageCount and doc:getVisiblePageCount() or 1
+        local next_page = doc:getCurrentPage() + math.max(1, count or 1)
+        if next_page > doc:getPageCount() then return nil end
+        return doc:getPageXPointer(next_page)
+    end)
+    return ok and xp or nil
+end
+
+--- Share of `span` ({pos0, pos1}) that comes before `xp` (0..1), or nil
+-- when `xp` is not inside it.
+function BookText.fractionBefore(ui, span, xp)
+    local doc = ui.document
+    local ok, frac = pcall(function()
+        -- compareXPointers(a, b) is 1 when b comes after a.
+        if doc:compareXPointers(xp, span.pos1) ~= 1 then return nil end
+        if doc:compareXPointers(span.pos0, xp) ~= 1 then return nil end
+        local before = #(doc:getTextFromXPointers(span.pos0, xp) or "")
+        local total = #(doc:getTextFromXPointers(span.pos0, span.pos1) or "")
+        if total == 0 then return nil end
+        return math.min(1, before / total)
+    end)
+    return ok and frac or nil
 end
 
 -- ── Highlighting the sentence being read ─────────────────────────────

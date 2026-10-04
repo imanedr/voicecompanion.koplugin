@@ -173,6 +173,11 @@ function SettingsMenu.build()
             description = _("Used for pronunciation help and explanations."),
             separator = true,
         }))
+    table.insert(items, {
+        text = _("Reading aloud"),
+        sub_item_table_func = function() return SettingsMenu.readAloudItems() end,
+        separator = true,
+    })
     table.insert(items, inputItem(function()
         return T(_("Device voice language: %1"), tostring(Config.load().local_tts.language))
     end, function() return "local_tts.language" end, {
@@ -185,6 +190,55 @@ function SettingsMenu.build()
         title = _("Device voice speed"), hint = "1.0", kind = "number",
     }))
     return items
+end
+
+local function choiceItem(path, value, label)
+    return {
+        text = label,
+        checked_func = function()
+            local node = Config.load()
+            for part in path:gmatch("[^%.]+") do node = type(node) == "table" and node[part] or nil end
+            return node == value
+        end,
+        callback = function() saveOrWarn(path, value) end,
+    }
+end
+
+function SettingsMenu.readAloudItems()
+    local function get(field) return Config.load().read_aloud[field] end
+    return {
+        {
+            text_func = function()
+                local n = tonumber(get("chunk_chars")) or 300
+                return T(_("Text per request: %1"), n > 0 and T(_("~%1 characters"), n) or _("one sentence"))
+            end,
+            sub_item_table = {
+                choiceItem("read_aloud.chunk_chars", 0, _("One sentence (highlight follows each sentence)")),
+                choiceItem("read_aloud.chunk_chars", 150, _("Short (~150 characters)")),
+                choiceItem("read_aloud.chunk_chars", 300, _("Medium (~300 characters)")),
+                choiceItem("read_aloud.chunk_chars", 500, _("Long (~500 characters)")),
+            },
+        },
+        {
+            text_func = function() return T(_("Requests at once: %1"), tostring(get("parallel") or 2)) end,
+            sub_item_table = {
+                choiceItem("read_aloud.parallel", 1, _("1 (slow connections)")),
+                choiceItem("read_aloud.parallel", 2, "2"),
+                choiceItem("read_aloud.parallel", 3, "3"),
+            },
+        },
+        {
+            text = _("Highlight the text being read"),
+            checked_func = function() return get("highlight") ~= false end,
+            callback = function() saveOrWarn("read_aloud.highlight", get("highlight") == false) end,
+        },
+        {
+            text = _("Trim silence around AI audio (pcm)"),
+            checked_func = function() return Config.load().trim_silence ~= false end,
+            callback = function() saveOrWarn("trim_silence", Config.load().trim_silence == false) end,
+            help_text = _("Some models (Gemini TTS) add silence before and after each clip, heard as pauses between sentences."),
+        },
+    }
 end
 
 return SettingsMenu
