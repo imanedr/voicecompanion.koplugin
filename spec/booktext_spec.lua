@@ -17,6 +17,8 @@ describe("BookText.endsSentence", function()
         { "Dr. ", "Who", false },
         { "no. ", "Then", true },           -- "no" ends a sentence
         { "No. ", "5", false },             -- but "No. 5" does not
+        { "laughed. \226\128\156", "It", true },  -- next sentence's opening quote
+        { "said, \226\128\156", "It", false },
     }
     for _, c in ipairs(cases) do
         it(string.format("%q + %s -> %s", c[1], tostring(c[2]), tostring(c[3])):gsub("\n", "\\n"), function()
