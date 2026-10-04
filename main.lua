@@ -120,6 +120,13 @@ function VoiceCompanion:speakLongText(text, engine)
     })
 end
 
+--- Read the book aloud from the sentence at (the word at) `xp`.
+function VoiceCompanion:readFrom(xp)
+    local BookText = require("voicecompanion/reader/booktext")
+    self:interruptReading()
+    self:getReadAloud():start(BookText.sentenceAt(self.ui, xp))
+end
+
 -- ── Text selection ─────────────────────────────────────────────────────
 
 local function selectedText(this)
@@ -172,8 +179,7 @@ function VoiceCompanion:showVoiceActions(selection)
                 enabled = BookText.isReflowable(self.ui) and selection.pos0 ~= nil,
                 callback = function()
                     close()
-                    self:interruptReading()
-                    self:getReadAloud():start(BookText.sentenceAt(self.ui, selection.pos0))
+                    self:readFrom(selection.pos0)
                 end,
             },
         },
@@ -194,8 +200,13 @@ function VoiceCompanion:showVoiceActions(selection)
             callback = function() close() Explain.askQuestion(self, selection) end,
         },
     })
+    local title = selection.text
+    if #title > 120 then
+        -- Cut on a character boundary, not inside a UTF-8 sequence.
+        title = title:sub(1, 121):gsub("[\192-\255][\128-\191]*$", "") .. "…"
+    end
     dialog = ButtonDialog:new{
-        title = selection.text:sub(1, 120),
+        title = title,
         title_align = "center",
         buttons = buttons,
     }
@@ -240,6 +251,31 @@ function VoiceCompanion:addDictionaryButtons()
         hold_callback = function(dict_popup)
             local cfg = require("voicecompanion/config").load()
             self:speakText(word(dict_popup), { speed = cfg.pronounce.slow_speed })
+        end,
+    })
+    -- Where the looked-up word is in the book (only when it was selected
+    -- on the page of a reflowable book).
+    local function wordPosition(dict_popup)
+        local hl = dict_popup.highlight
+        local sel = hl and hl.selected_text
+        if sel and sel.pos0 and require("voicecompanion/reader/booktext").isReflowable(self.ui) then
+            return sel.pos0
+        end
+    end
+    self.ui.dictionary:addToDictButtons({
+        id = "vc_3_read",
+        text = "▶ " .. _("Read from here"),
+        conditional = true,
+        row_group = "voicecompanion",
+        show_func = function(dict_popup) return wordPosition(dict_popup) ~= nil end,
+        callback = function(dict_popup)
+            local xp = wordPosition(dict_popup)
+            dict_popup:onClose()
+            if xp then
+                self:readFrom(xp)
+            else
+                UIManager:show(InfoMessage:new{ text = _("Reading aloud works with EPUB, FB2 and other reflowable books.") })
+            end
         end,
     })
     self.ui.dictionary:addToDictButtons({

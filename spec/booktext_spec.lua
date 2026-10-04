@@ -15,6 +15,8 @@ describe("BookText.endsSentence", function()
         { "him. ", "and", false },          -- lowercase next word continues
         { "Wait... ", "Then", true },
         { "Dr. ", "Who", false },
+        { "no. ", "Then", true },           -- "no" ends a sentence
+        { "No. ", "5", false },             -- but "No. 5" does not
     }
     for _, c in ipairs(cases) do
         it(string.format("%q + %s -> %s", c[1], tostring(c[2]), tostring(c[3])):gsub("\n", "\\n"), function()

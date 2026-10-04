@@ -5,6 +5,9 @@ Audio file playback on Linux (desktop KOReader) through an external player
 
 local UIManager = require("ui/uimanager")
 
+local has_socket, socket = pcall(require, "socket")
+local now = has_socket and socket.gettime or os.time
+
 local LinuxPlayer = {
     name = "Linux player",
     POLL_INTERVAL = 0.2,
@@ -51,6 +54,21 @@ function LinuxPlayer.canPlayMp3()
     return d ~= nil and d.mp3
 end
 
+--- Duration in ms of a PCM WAV file, or nil (other formats, bad header).
+function LinuxPlayer.wavDuration(path)
+    if not path:find("%.wav$") then return nil end
+    local f = io.open(path, "rb")
+    if not f then return nil end
+    local header = f:read(44)
+    local size = f:seek("end")
+    f:close()
+    if not header or #header < 44 or header:sub(1, 4) ~= "RIFF" then return nil end
+    local b1, b2, b3, b4 = header:byte(29, 32)
+    local byte_rate = b1 + b2 * 256 + b3 * 65536 + b4 * 16777216
+    if byte_rate <= 0 then return nil end
+    return (size - 44) / byte_rate * 1000
+end
+
 function LinuxPlayer:new()
     return setmetatable({}, self)
 end
@@ -77,6 +95,8 @@ function LinuxPlayer:play(path, on_done)
     end
     self._pid = pid
     self._paused = false
+    self._started, self._paused_at, self._paused_total = now(), nil, 0
+    self._duration = LinuxPlayer.wavDuration(path)
     local function poll()
         if self._pid ~= pid then return end
         if ffiutil.isSubProcessDone(pid) then
@@ -105,6 +125,7 @@ function LinuxPlayer:pause()
     if self._pid and not self._paused then
         os.execute("kill -STOP -" .. self._pid .. " 2>/dev/null")
         self._paused = true
+        self._paused_at = now()
     end
 end
 
@@ -112,7 +133,18 @@ function LinuxPlayer:resume()
     if self._pid and self._paused then
         os.execute("kill -CONT -" .. self._pid .. " 2>/dev/null")
         self._paused = false
+        if self._paused_at then
+            self._paused_total = self._paused_total + (now() - self._paused_at)
+            self._paused_at = nil
+        end
     end
+end
+
+--- ms played (wall clock minus pauses) and ms total (WAV only, else nil).
+function LinuxPlayer:progress()
+    if not self._pid or not self._started then return nil end
+    local t = (self._paused_at or now()) - self._started - (self._paused_total or 0)
+    return math.max(0, t * 1000), self._duration
 end
 
 function LinuxPlayer:isPaused()

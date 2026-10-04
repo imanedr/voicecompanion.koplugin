@@ -24,6 +24,14 @@ describe("AudioCache.path", function()
         end)
     end
 
+    it("keeps the old key when extra is empty, and changes with extra", function()
+        local parts = { provider = "p", model = "m", voice = "v", speed = 1, format = "pcm", text = "t" }
+        local with_empty = { provider = "p", model = "m", voice = "v", speed = 1, format = "pcm", text = "t", extra = "" }
+        local with_extra = { provider = "p", model = "m", voice = "v", speed = 1, format = "pcm", text = "t", extra = "trim" }
+        assert_eq(AudioCache.path(parts), AudioCache.path(with_empty))
+        assert_true(AudioCache.path(parts) ~= AudioCache.path(with_extra))
+    end)
+
     it("is not fooled by shifting text between fields", function()
         local a = AudioCache.path({ provider = "ab", model = "c", text = "" }, "mp3")
         local b = AudioCache.path({ provider = "a", model = "bc", text = "" }, "mp3")

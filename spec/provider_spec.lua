@@ -29,6 +29,12 @@ local PCM = string.rep("\1\2", 100)
 describe("Provider.writeWav", function()
     before_each(Stubs.cleanTmp)
 
+    it("leaves no temporary .part file behind", function()
+        local path = Stubs.TMP .. "/atomic.wav"
+        assert_true(Provider.writeWav(path, PCM, 24000))
+        assert_nil(io.open(path .. ".part", "rb"))
+    end)
+
     it("writes a 16-bit mono PCM header", function()
         local path = Stubs.TMP .. "/a.wav"
         assert_true(Provider.writeWav(path, PCM, 24000))
@@ -58,6 +64,25 @@ describe("Provider.writeWav", function()
         local ok, err = Provider.writeWav(Stubs.TMP .. "/missing/dir/x.wav", PCM, 8000)
         assert_eq(ok, false)
         assert_eq(type(err), "string")
+    end)
+end)
+
+describe("Provider.trimSilence", function()
+    local function sample(v) if v < 0 then v = v + 65536 end return string.char(v % 256, math.floor(v / 256)) end
+    local function samples(n, v) return string.rep(sample(v), n) end
+
+    it("cuts long leading and trailing silence, keeping a margin", function()
+        -- 1000 Hz rate: 1 sample = 1 ms.  500 ms silence, 100 ms sound, 2000 ms silence.
+        local pcm = samples(500, 0) .. samples(100, -5000) .. samples(2000, 3)
+        local out = Provider.trimSilence(pcm, 1000, 60, 250)
+        assert_eq(#out, (60 + 100 + 250) * 2)
+        assert_eq(out:sub(61 * 2 - 1, 61 * 2), sample(-5000))
+    end)
+
+    it("leaves all-silent or empty audio alone", function()
+        local quiet = samples(300, 10)
+        assert_eq(Provider.trimSilence(quiet, 1000), quiet)
+        assert_eq(Provider.trimSilence("", 1000), "")
     end)
 end)
 

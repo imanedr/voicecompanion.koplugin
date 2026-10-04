@@ -11,7 +11,7 @@ local Sentences = {
 
 local ABBREVIATIONS = {
     mr = true, mrs = true, ms = true, dr = true, prof = true, st = true, jr = true, sr = true,
-    vs = true, etc = true, ["e.g"] = true, ["i.e"] = true, no = true, vol = true, fig = true,
+    vs = true, etc = true, ["e.g"] = true, ["i.e"] = true, vol = true, fig = true,
 }
 
 local function trim(s) return (s:gsub("^%s+", ""):gsub("%s+$", "")) end
@@ -37,7 +37,8 @@ function Sentences.split(text)
                 while para:sub(j + 1, j + 2) == "\194\187" do j = j + 2 end
                 local nxt = para:sub(j + 1, j + 1)
                 local word = para:sub(start, i - 1):match("([%a%.]+)$")
-                local is_abbrev = c == "." and word and ABBREVIATIONS[word:lower()]
+                local is_abbrev = c == "." and word and (ABBREVIATIONS[word:lower()]
+                    or (word:lower() == "no" and para:sub(j + 2, j + 2):match("%d")))   -- "No. 5"
                 local is_decimal = c == "." and para:sub(i - 1, i - 1):match("%d") and nxt:match("%d")
                 if (nxt == "" or nxt == " ") and not is_abbrev and not is_decimal then
                     table.insert(out, trim(para:sub(start, j)))

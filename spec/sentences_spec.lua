@@ -10,6 +10,11 @@ describe("Sentences.split", function()
             { "Mr. Smith met Dr. Jones, e.g. at noon.", "Then left." })
     end)
 
+    it("splits after the word no, but not in No. 5", function()
+        assert_eq(Sentences.split("I said no. Then left. See No. 5 here."),
+            { "I said no.", "Then left.", "See No. 5 here." })
+    end)
+
     it("does not split decimals", function()
         assert_eq(Sentences.split("Pi is 3.14 today. Fine."), { "Pi is 3.14 today.", "Fine." })
     end)

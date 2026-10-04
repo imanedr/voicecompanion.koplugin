@@ -68,6 +68,10 @@ preload("ui/uimanager", function()
     return UIManager
 end)
 
+preload("ui/event", function()
+    return { new = function(_, name, ...) return { name = name, args = { ... } } end }
+end)
+
 preload("ui/widget/infomessage", function()
     return { new = function(self, o) return o or self end }
 end)

@@ -34,6 +34,9 @@ function AudioCache.path(parts, ext)
         parts.provider or "", parts.model or "", parts.voice or "",
         string.format("%.2f", parts.speed or 1), parts.format or "", parts.text or "",
     }, "\31")
+    -- Anything else that changes the sound (sample rate, extra request
+    -- fields, post-processing).  Left out when empty so older keys still hit.
+    if parts.extra and parts.extra ~= "" then key = key .. "\31" .. parts.extra end
     return string.format("%s/%s.%s", AudioCache.dir(), hash(key), ext or "mp3")
 end
 
