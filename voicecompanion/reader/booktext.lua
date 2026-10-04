@@ -5,11 +5,13 @@ Access to the book's text and on-screen positions, for reflowable documents
 crengine exposes word navigation but no sentence navigation, so sentences
 are built here by walking words: a sentence ends after . ! ? … (unless it
 is an abbreviation, or the next word starts in lowercase), at a paragraph
-break, or after MAX_WORDS words.
+break, or, for a very long sentence, at a clause break (, ; : —) after
+SOFT_WORDS words and in any case after MAX_WORDS words.
 --]]
 
 local BookText = {
-    MAX_WORDS = 60,
+    SOFT_WORDS = 60,
+    MAX_WORDS = 120,
 }
 
 local ABBREVIATIONS = {
@@ -39,6 +41,12 @@ end
 function BookText.endsSentence(chunk, next_word)
     if chunk:find("\n") then return true end   -- paragraph / block break
     local s = chunk:gsub("%s+$", ""):gsub("\226\128\166", "...")   -- … -> ...
+    -- Drop the next sentence's opening quote or bracket: him. “It ...
+    while true do
+        local t = s:gsub("%s*[%(%[]$", ""):gsub("%s*\226\128[\156\152]$", ""):gsub("%s*\194\171$", "")
+        if t == s then break end
+        s = t
+    end
     -- Strip closing quotes and brackets: ” ’ » " ' ) ]
     while true do
         local t = s:gsub("[\"')%]]$", ""):gsub("\226\128[\157\153]$", ""):gsub("\194\187$", "")
@@ -79,8 +87,33 @@ function BookText.blockPath(xp)
     return path
 end
 
-local CLOSING = { ".", "!", "?", "\"", "'", ")", "]", ":", ";",
-    "\226\128\166", "\226\128\157", "\226\128\153", "\194\187" }  -- … ” ’ »
+local CLOSING = { ".", "!", "?", "\"", "'", ")", "]", ":", ";", ",",
+    "\226\128\166", "\226\128\157", "\226\128\153", "\194\187",   -- … ” ’ »
+    "\226\128\148", "\226\128\147" }  -- — –
+
+-- A clause ends here: a long sentence may be split after this chunk.
+local function endsClause(chunk)
+    local rest = chunk:gsub("^[^%s%p\128-\255]+", "")
+    return rest:find("^[,;:]") ~= nil or rest:find("^\226\128[\147\148]") ~= nil
+end
+
+--- `xp` moved forward over `text` (the characters right after it), or
+-- nil when the document's characters there don't match.  Steps until the
+-- text matches: a step can also cross a text node boundary without
+-- passing a character.
+local function advanceOver(doc, xp, text)
+    local want = text:gsub("%s+", "")
+    local target = xp
+    for _i = 1, 2 * #want + 2 do
+        local ok, nxt = pcall(doc.getNextVisibleChar, doc, target)
+        if not ok or not nxt or nxt == target then return nil end
+        target = nxt
+        local got = (doc:getTextFromXPointers(xp, target) or ""):gsub("%s+", "")
+        if got == want then return target end
+        if #got > #want then return nil end
+    end
+    return nil
+end
 
 --- The leading run of closing punctuation in `s` (stops at anything else,
 -- e.g. the next block's opening quote).
@@ -136,15 +169,22 @@ function BookText.sentenceFrom(ui, ws)
             next_word = ok_n and nwe and doc:getTextFromXPointers(nws, nwe) or nil
         end
         local new_block = BookText.blockPath(cur) ~= BookText.blockPath(nws)
-        if new_block or BookText.endsSentence(chunk, next_word) or words >= BookText.MAX_WORDS then
-            -- End at the next word's start so closing punctuation is included
-            -- (but not across a block boundary, which would highlight it).
-            pos1 = new_block and we or nws
-            if new_block then
-                -- Keep the block's final punctuation for intonation.
-                local word_text = doc:getTextFromXPointers(cur, we) or ""
-                if word_text ~= "" and chunk:sub(1, #word_text) == word_text then
-                    trailing = BookText.closingPunctuation(chunk:sub(#word_text + 1))
+        if new_block or BookText.endsSentence(chunk, next_word) or words >= BookText.MAX_WORDS
+                or (words >= BookText.SOFT_WORDS and endsClause(chunk)) then
+            -- End right after the word's closing punctuation, so the
+            -- highlight and the spoken text stop at the full stop, closing
+            -- quote or comma (never on the next word or block).
+            pos1 = we
+            local word_text = doc:getTextFromXPointers(cur, we) or ""
+            if word_text ~= "" and chunk:sub(1, #word_text) == word_text then
+                local closing = BookText.closingPunctuation(chunk:sub(#word_text + 1))
+                if closing ~= "" then
+                    local after = advanceOver(doc, we, closing)
+                    if after then
+                        pos1 = after
+                    else
+                        trailing = closing   -- at least speak it
+                    end
                 end
             end
             next_start = nws
